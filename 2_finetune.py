@@ -322,8 +322,9 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     tokenize_fn = build_tokenize_fn(tokenizer)
 
+    # --- AFTER (FIXED) ---
     tokenized = dataset.map(
-        tokenize_fn, batched=True, remove_columns=["text", "language"]
+        tokenize_fn, batched=True, remove_columns=["text"] # Keep 'language' here
     )
     tokenized.set_format("torch")
 
