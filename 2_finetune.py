@@ -377,7 +377,6 @@ def main(args):
         args=training_args,
         train_dataset=tokenized["train"],
         eval_dataset=tokenized["validation"],
-        tokenizer=tokenizer,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=2)],
