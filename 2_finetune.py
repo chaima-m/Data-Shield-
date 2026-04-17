@@ -168,30 +168,33 @@ def compute_metrics(eval_pred):
 
 # ─── Per-language evaluation ─────────────────────────────────────────────────
 
-def eval_per_language(model, tokenizer, df, device):
-    log.info("Running per-language evaluation …")
+def eval_per_language(model, tokenizer, test_df, device):
+    log.info("Running per-language evaluation...")
     model.eval()
-    for lang in df["language"].unique() if "language" in df.columns else ["all"]:
-        sub = df[df["language"] == lang] if "language" in df.columns else df
-        if len(sub) == 0:
-            continue
-        texts  = sub["text"].tolist()
-        labels = sub["label_id"].tolist()
-        preds  = []
-        batch_size = 64
-        for i in range(0, len(texts), batch_size):
-            enc = tokenizer(
-                texts[i:i+batch_size],
-                truncation=True, max_length=MAX_LENGTH,
-                padding=True, return_tensors="pt"
-            ).to(device)
-            with torch.no_grad():
-                out = model(**enc)
-            preds += out.logits.argmax(-1).cpu().tolist()
+    
+    # Get actual unique labels present in the test set to prevent crash
+    unique_test_labels = sorted(test_df['label'].unique().tolist())
+    target_names = [L for L in LABELS if L in unique_test_labels]
 
-        log.info(f"\n=== Language: {lang.upper()} ===\n" +
-                 classification_report(labels, preds,
-                                       target_names=LABELS, zero_division=0))
+    for lang in test_df['language'].unique():
+        lang_df = test_df[test_df['language'] == lang]
+        texts = lang_df['text'].tolist()
+        # Convert string labels to IDs
+        labels = [LABELS.index(l) for l in lang_df['label'].tolist()]
+        
+        preds = []
+        for i in range(0, len(texts), 32):
+            batch = texts[i:i+32]
+            inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=128).to(device)
+            with torch.no_grad():
+                logits = model(**inputs).logits
+                preds.extend(torch.argmax(logits, dim=-1).cpu().tolist())
+        
+        log.info(f"\nResults for {lang.upper()}:")
+        # Added 'labels' filter to classification_report to ignore missing classes
+        print(classification_report(labels, preds, 
+                                    target_names=target_names, 
+                                    labels=[LABELS.index(l) for l in target_names]))
 
 
 # ─── ONNX export ─────────────────────────────────────────────────────────────
